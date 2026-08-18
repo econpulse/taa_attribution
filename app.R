@@ -11,9 +11,19 @@ ui <- page_fillable(
     bootswatch = "cosmo",
     primary = "#0d6efd"
   ),
-  bslib::page_header(
-    title = "TAA Attribution",
-    subtitle = "Exploration workspace"
+  shiny::tags$header(
+    class = paste(
+      "container-fluid border-bottom bg-body-tertiary",
+      "px-4 py-3 flex-shrink-0"
+    ),
+    shiny::tags$h1(
+      class = "h3 mb-1",
+      "TAA Attribution"
+    ),
+    shiny::tags$p(
+      class = "text-muted mb-0",
+      "Exploration workspace"
+    )
   ),
   mod_attribution_ui("attribution")
 )
