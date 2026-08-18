@@ -1,0 +1,15 @@
+Package: taaAttribution
+Title: Flexible Brinson Performance Attribution Dashboard
+Version: 0.1.0
+Authors@R: person("TAA", "Team", role = c("aut", "cre"), email = "team@example.com")
+Description: A Shiny dashboard for importing return series, enriching instrument
+    metadata, defining portfolios and composite benchmarks, and calculating
+    Brinson-Fachler attribution with a separate currency effect.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends:
+    R (>= 4.6.0)
+Imports:
+    bslib (>= 0.12.0),
+    readxl,
+    shiny
