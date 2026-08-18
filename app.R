@@ -1,6 +1,7 @@
 library(shiny)
 library(bslib)
 
+source("R/brinson.R")
 source("R/mod_attribution_ui.R")
 source("R/mod_attribution_server.R")
 
