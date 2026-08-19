@@ -19,23 +19,37 @@ base and does not produce a return. Blank prices are skipped; at least two obser
 prices are needed for a ticker to produce a return.
 
 The metadata step classifies each series as either an **asset** or **currency**
-series. Assets receive a freely chosen asset-class label and a currency exposure.
-Currency series use that exposure as their currency key. For example, a EUR asset
-has `currency = EUR`, while an EUR/base FX return series has type `currency` and
-also has `currency = EUR`. Base-currency assets use the configurable `BASE` key.
+series. Assets receive a freely chosen asset-class label and one of the supported
+currency codes. Currency series instead receive an explicit FX base/quote pair.
 
 Keeping FX series separate avoids silently folding currency performance into asset
 selection. For a foreign asset, the base return is calculated exactly as
 `(1 + local return) * (1 + FX return) - 1`. A missing foreign-currency series is a
 validation error rather than being treated as a zero return.
 
-## Portfolio and benchmark definitions
+## Portfolio definitions
 
-The portfolio and composite benchmark are defined as ticker weights. Inputs do not
-need to sum to one: the calculation normalizes each side independently. Weights must
-be non-negative. The selected attribution frequency represents the rebalancing
-frequency for these target weights. `Full horizon` applies one period to the entire
-selected date range.
+Every portfolio (including a benchmark) is defined in exactly the same way: a name,
+a base currency (CHF, EUR, or USD), and ticker weights. In the attribution tab, two
+saved portfolios are selected for comparison. Inputs do not need to sum to one; the
+calculation normalizes each side independently. Rebalancing can follow a daily,
+weekly, monthly, quarterly, or annual frequency, or a list of specific dates.
+
+## Currency convention
+
+Assets carry their local currency. Each FX series explicitly records a base and a
+quote currency: `EUR / USD` means USD per one EUR. For a USD portfolio, this series
+therefore converts EUR assets directly; for an EUR portfolio, the application
+inverts its return. Comparisons currently require both portfolios to share one of
+the supported base currencies (CHF, EUR, USD). This explicit pair direction is also
+the foundation for a later currency-allocation decomposition.
+
+## Persistence and backups
+
+Returns, metadata, portfolios, and specific rebalancing dates are stored in a local
+SQLite database (`data/taa-attribution.sqlite` by default). The Data & backup tab
+can download the database as one portable backup and restore a previously downloaded
+SQLite file.
 
 ## Attribution model
 

@@ -66,7 +66,7 @@ wide_prices_to_returns <- function(data) {
       call. = FALSE)
   }
 
-  rows <- lapply(seq_len(nrow(data)), function(i) {
+  observations <- lapply(seq_len(nrow(data)), function(i) {
     ticker <- trimws(as.character(data$ticker[i]))
     name <- as.character(data$name[i])
     raw_prices <- unlist(data[i, -(1:2), drop = FALSE], use.names = FALSE)
@@ -83,17 +83,26 @@ wide_prices_to_returns <- function(data) {
       stop("Prices must be finite and greater than zero (ticker: ", ticker, ").",
         call. = FALSE)
     }
-    order_index <- order(observed_dates)
-    prices <- prices[order_index]
-    observed_dates <- observed_dates[order_index]
-    if (length(prices) < 2L) return(empty_returns())
     data.frame(
-      ticker = rep(ticker, length(prices) - 1L),
-      date = observed_dates[-1L],
-      name = rep(name, length(prices) - 1L),
-      value = prices[-1L] / prices[-length(prices)] - 1,
+      ticker = rep(ticker, length(prices)), date = observed_dates,
+      name = rep(name, length(prices)), price = prices,
       stringsAsFactors = FALSE
     )
+  })
+  observations <- do.call(rbind, observations)
+  if (!nrow(observations)) return(empty_returns())
+  if (anyDuplicated(observations[c("ticker", "date")])) {
+    stop("Each ticker/date price observation must be unique.", call. = FALSE)
+  }
+
+  # Returns must never depend on workbook row or column order. Group the complete
+  # observation set by series and sort every group before taking price ratios.
+  series <- split(observations, observations$ticker)
+  rows <- lapply(series, function(x) {
+    x <- x[order(x$date), , drop = FALSE]
+    if (nrow(x) < 2L) return(empty_returns())
+    data.frame(ticker = x$ticker[-1L], date = x$date[-1L], name = x$name[-1L],
+      value = x$price[-1L] / x$price[-nrow(x)] - 1, stringsAsFactors = FALSE)
   })
   validate_returns(do.call(rbind, rows))
 }
@@ -107,7 +116,9 @@ metadata_from_returns <- function(data) {
     name = tickers$name,
     instrument_type = rep("asset", row_count),
     asset_class = rep("Unclassified", row_count),
-    currency = rep("BASE", row_count),
+    currency = rep("CHF", row_count),
+    fx_base = rep("EUR", row_count),
+    fx_quote = rep("USD", row_count),
     return_type = rep("simple", row_count),
     enabled = rep(TRUE, row_count),
     stringsAsFactors = FALSE
@@ -117,11 +128,20 @@ metadata_from_returns <- function(data) {
 period_key <- function(date, frequency) {
   if (frequency == "Full horizon") return(rep("Full horizon", length(date)))
   if (frequency == "Daily") return(format(date, "%Y-%m-%d"))
+  if (frequency == "Weekly") return(format(date - as.integer(format(date, "%u")) + 1, "%Y-%m-%d"))
   if (frequency == "Monthly") return(format(date, "%Y-%m"))
   if (frequency == "Quarterly") {
     return(paste0(format(date, "%Y"), "-Q", (as.integer(format(date, "%m")) - 1L) %/% 3L + 1L))
   }
   format(date, "%Y")
+}
+
+custom_period_key <- function(date, rebalancing_dates) {
+  rebalancing_dates <- sort(unique(as.Date(rebalancing_dates)))
+  if (!length(rebalancing_dates)) stop("Enter at least one rebalancing date.", call. = FALSE)
+  starts <- findInterval(as.Date(date), rebalancing_dates)
+  if (any(starts == 0L)) stop("The first rebalancing date must be on or before the selected range.", call. = FALSE)
+  format(rebalancing_dates[starts], "%Y-%m-%d")
 }
 
 compound_return <- function(x, type = "simple") {
@@ -130,17 +150,21 @@ compound_return <- function(x, type = "simple") {
   prod(1 + x) - 1
 }
 
-prepare_period_returns <- function(returns, metadata, start, end, frequency) {
+prepare_period_returns <- function(returns, metadata, start, end, frequency,
+                                   rebalancing_dates = NULL) {
   metadata$name <- NULL
   data <- merge(returns, metadata, by = "ticker", all.x = TRUE)
   data <- data[data$enabled & data$date >= start & data$date <= end, , drop = FALSE]
   if (!nrow(data)) stop("No enabled observations in the selected period.", call. = FALSE)
-  data$period <- period_key(data$date, frequency)
+  data <- data[order(data$ticker, data$date), , drop = FALSE]
+  data$period <- if (identical(frequency, "Custom")) {
+    custom_period_key(data$date, rebalancing_dates)
+  } else period_key(data$date, frequency)
   groups <- split(data, interaction(data$ticker, data$period, drop = TRUE))
   rows <- lapply(groups, function(x) data.frame(
     ticker = x$ticker[1], period = x$period[1], name = x$name[1],
     instrument_type = x$instrument_type[1], asset_class = x$asset_class[1],
-    currency = x$currency[1],
+    currency = x$currency[1], fx_base = x$fx_base[1], fx_quote = x$fx_quote[1],
     return = compound_return(x$value, x$return_type[1]),
     stringsAsFactors = FALSE
   ))
@@ -159,14 +183,21 @@ normalize_weights <- function(weights, label) {
 }
 
 brinson_attribution <- function(period_returns, metadata, portfolio_weights,
-                                benchmark_weights, base_currency = "BASE") {
+                                benchmark_weights, base_currency = "CHF") {
   available <- metadata$ticker[metadata$instrument_type == "asset" & metadata$enabled]
   portfolio_weights <- portfolio_weights[portfolio_weights$ticker %in% available, , drop = FALSE]
   benchmark_weights <- benchmark_weights[benchmark_weights$ticker %in% available, , drop = FALSE]
   portfolio_weights <- normalize_weights(portfolio_weights, "Portfolio")
   benchmark_weights <- normalize_weights(benchmark_weights, "Benchmark")
   assets <- period_returns[period_returns$instrument_type == "asset", , drop = FALSE]
-  fx <- period_returns[period_returns$instrument_type == "currency", c("period", "currency", "return")]
+  fx <- period_returns[period_returns$instrument_type == "currency", , drop = FALSE]
+  relevant <- (fx$fx_base != base_currency & fx$fx_quote == base_currency) |
+    (fx$fx_base == base_currency & fx$fx_quote != base_currency)
+  fx <- fx[relevant, , drop = FALSE]
+  fx$currency <- ifelse(fx$fx_quote == base_currency, fx$fx_base, fx$fx_quote)
+  reverse <- fx$fx_base == base_currency
+  fx$return[reverse] <- 1 / (1 + fx$return[reverse]) - 1
+  fx <- fx[c("period", "currency", "return")]
   if (anyDuplicated(fx[c("period", "currency")])) {
     stop("Define at most one FX series for each currency.", call. = FALSE)
   }

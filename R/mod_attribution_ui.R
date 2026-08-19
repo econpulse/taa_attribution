@@ -1,90 +1,68 @@
 mod_attribution_ui <- function(id) {
   ns <- shiny::NS(id)
+  currencies <- c("CHF", "EUR", "USD")
 
   bslib::navset_card_tab(
     title = "Brinson workflow",
-    bslib::nav_panel(
-      "1. Returns",
-      bslib::layout_columns(
-        col_widths = c(4, 8),
-        bslib::card(
-          bslib::card_header("Upload price series"),
-          shiny::fileInput(ns("return_file"), "Excel workbook", accept = ".xlsx"),
-          shiny::helpText(paste(
-            "Wide format: the first two columns contain ticker and name;",
-            "all following column headers are Excel serial dates and their values are prices.",
-            "Period returns are calculated automatically."
-          )),
-          shiny::uiOutput(ns("upload_status"))
-        ),
-        bslib::card(
-          bslib::card_header("Imported observations"),
-          DT::DTOutput(ns("returns_table"))
-        )
-      )
-    ),
-    bslib::nav_panel(
-      "2. Metadata",
-      bslib::layout_columns(
-        col_widths = c(4, 8),
-        bslib::card(
-          bslib::card_header("Edit instrument metadata"),
+    bslib::nav_panel("1. Metadata",
+      bslib::layout_columns(col_widths = c(4, 8),
+        bslib::card(bslib::card_header("Import and classify series"),
+          shiny::fileInput(ns("return_file"), "Price workbook (.xlsx)", accept = ".xlsx"),
+          shiny::uiOutput(ns("upload_status")), shiny::hr(),
           shiny::selectInput(ns("meta_ticker"), "Ticker", choices = NULL),
           shiny::textInput(ns("meta_name"), "Display name"),
           shiny::selectInput(ns("instrument_type"), "Series type",
             c("Asset" = "asset", "Currency / FX" = "currency")),
           shiny::textInput(ns("asset_class"), "Asset class"),
-          shiny::textInput(ns("currency"), "Currency / FX exposure", value = "BASE"),
+          shiny::selectInput(ns("currency"), "Asset currency", currencies),
+          shiny::selectInput(ns("fx_base"), "FX: one unit of", currencies),
+          shiny::selectInput(ns("fx_quote"), "is valued in", currencies, selected = "USD"),
+          shiny::helpText("Example: base EUR and quote USD means the series is USD per 1 EUR."),
           shiny::selectInput(ns("return_type"), "Return convention",
             c("Simple return" = "simple", "Log return" = "log")),
           shiny::checkboxInput(ns("enabled"), "Include series", TRUE),
-          shiny::actionButton(ns("save_metadata"), "Save metadata", class = "btn-primary")
-        ),
-        bslib::card(
-          bslib::card_header("Metadata catalogue"),
-          DT::DTOutput(ns("metadata_table"))
-        )
-      )
-    ),
-    bslib::nav_panel(
-      "3. Portfolios",
-      bslib::layout_columns(
-        col_widths = c(4, 8),
-        bslib::card(
-          bslib::card_header("Portfolio and composite benchmark"),
+          shiny::actionButton(ns("save_metadata"), "Save metadata", class = "btn-primary")),
+        bslib::card(bslib::card_header("Metadata catalogue"), DT::DTOutput(ns("metadata_table"))))),
+    bslib::nav_panel("2. Portfolios",
+      bslib::layout_columns(col_widths = c(4, 8),
+        bslib::card(bslib::card_header("Portfolio definition"),
           shiny::textInput(ns("portfolio_name"), "Portfolio name", "Portfolio"),
-          shiny::textInput(ns("benchmark_name"), "Composite benchmark name", "Policy benchmark"),
+          shiny::selectInput(ns("portfolio_base_currency"), "Base currency", currencies),
           shiny::selectInput(ns("weight_ticker"), "Asset", choices = NULL),
-          shiny::numericInput(ns("portfolio_weight"), "Portfolio weight", 0, min = 0, step = 0.01),
-          shiny::numericInput(ns("benchmark_weight"), "Benchmark weight", 0, min = 0, step = 0.01),
-          shiny::actionButton(ns("save_weight"), "Set weights", class = "btn-primary"),
-          shiny::actionButton(ns("equal_weights"), "Initialize equal weights")
-        ),
-        bslib::card(
-          bslib::card_header("Definition (normalized when calculated)"),
-          DT::DTOutput(ns("weights_table"))
-        )
-      )
-    ),
-    bslib::nav_panel(
-      "4. Attribution",
-      bslib::layout_columns(
-        col_widths = c(4, 8),
-        bslib::card(
-          bslib::card_header("Calculation settings"),
+          shiny::numericInput(ns("portfolio_weight"), "Weight", 0, min = 0, step = 0.01),
+          shiny::actionButton(ns("save_weight"), "Save weight", class = "btn-primary"),
+          shiny::actionButton(ns("equal_weights"), "Set equal weights")),
+        bslib::card(bslib::card_header("All portfolio definitions"), DT::DTOutput(ns("weights_table"))))),
+    bslib::nav_panel("3. Rebalancing dates",
+      bslib::layout_columns(col_widths = c(4, 8),
+        bslib::card(bslib::card_header("Schedule"),
+          shiny::radioButtons(ns("schedule_mode"), "Schedule type",
+            c("Frequency" = "frequency", "Specific dates" = "custom")),
+          shiny::selectInput(ns("frequency"), "Frequency",
+            c("Daily", "Weekly", "Monthly", "Quarterly", "Annually" = "Yearly")),
+          shiny::dateInput(ns("rebalancing_date"), "Rebalancing date"),
+          shiny::actionButton(ns("add_rebalancing_date"), "Add date", class = "btn-primary")),
+        bslib::card(bslib::card_header("Specific dates"), DT::DTOutput(ns("rebalancing_table"))))),
+    bslib::nav_panel("4. Attribution",
+      bslib::layout_columns(col_widths = c(4, 8),
+        bslib::card(bslib::card_header("Comparison settings"),
+          shiny::selectInput(ns("portfolio_a"), "Portfolio", choices = NULL),
+          shiny::selectInput(ns("portfolio_b"), "Comparison portfolio / benchmark", choices = NULL),
           shiny::dateRangeInput(ns("date_range"), "Start and end"),
-          shiny::selectInput(ns("frequency"), "Rebalancing / attribution period",
-            c("Monthly", "Quarterly", "Yearly", "Daily", "Full horizon")),
-          shiny::textInput(ns("base_currency"), "Base currency", "BASE"),
-          shiny::helpText("Asset returns stay local. FX series are linked separately and reported as a currency effect."),
-          shiny::actionButton(ns("calculate"), "Run Brinson decomposition", class = "btn-success")
-        ),
-        bslib::card(
-          bslib::card_header(shiny::textOutput(ns("result_title"), inline = TRUE)),
+          shiny::actionButton(ns("calculate"), "Run Brinson decomposition", class = "btn-success")),
+        bslib::card(bslib::card_header(shiny::textOutput(ns("result_title"), inline = TRUE)),
           DT::DTOutput(ns("attribution_table")),
-          shiny::downloadButton(ns("download_results"), "Download results")
-        )
-      )
-    )
+          shiny::downloadButton(ns("download_results"), "Download results")))),
+    bslib::nav_panel("5. Visualization",
+      bslib::card(bslib::card_header("Attribution contributions through time"),
+        shiny::plotOutput(ns("attribution_plot"), height = "520px"))),
+    bslib::nav_panel("6. Data & backup",
+      bslib::layout_columns(col_widths = c(6, 6),
+        bslib::card(bslib::card_header("Download backup"),
+          shiny::helpText("All inputs are stored permanently in a local SQLite database."),
+          shiny::downloadButton(ns("download_database"), "Download SQLite database")),
+        bslib::card(bslib::card_header("Restore backup"),
+          shiny::fileInput(ns("database_file"), "SQLite database", accept = c(".sqlite", ".db")),
+          shiny::actionButton(ns("restore_database"), "Restore database", class = "btn-warning"))))
   )
 }

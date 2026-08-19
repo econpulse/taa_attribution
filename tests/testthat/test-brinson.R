@@ -7,7 +7,7 @@ test_that("empty returns produce typed, empty metadata", {
   expect_identical(nrow(metadata), 0L)
   expect_named(metadata, c(
     "ticker", "name", "instrument_type", "asset_class", "currency",
-    "return_type", "enabled"
+    "fx_base", "fx_quote", "return_type", "enabled"
   ))
   expect_type(metadata$enabled, "logical")
 })
@@ -26,8 +26,25 @@ test_that("metadata defaults are repeated for every ticker", {
   expect_equal(nrow(metadata), 2L)
   expect_equal(metadata$instrument_type, c("asset", "asset"))
   expect_equal(metadata$asset_class, c("Unclassified", "Unclassified"))
-  expect_equal(metadata$currency, c("BASE", "BASE"))
+  expect_equal(metadata$currency, c("CHF", "CHF"))
   expect_true(all(metadata$enabled))
+})
+
+test_that("prices are grouped by ticker and sorted before returns are calculated", {
+  prices <- data.frame(
+    Code = c("EQUITY", "EQUITY"), Description = c("Equity", "Equity"),
+    `46025` = c(121, NA), `46023` = c(NA, 100), `46024` = c(110, NA),
+    check.names = FALSE
+  )
+  returns <- wide_prices_to_returns(prices)
+  expect_equal(returns$date, as.Date(c("2026-01-02", "2026-01-03")))
+  expect_equal(returns$value, c(.1, .1))
+})
+
+test_that("custom periods use sorted rebalancing dates", {
+  dates <- as.Date(c("2026-02-02", "2026-01-15", "2026-01-20"))
+  expect_equal(custom_period_key(dates, as.Date(c("2026-02-01", "2026-01-01"))),
+    c("2026-02-01", "2026-01-01", "2026-01-01"))
 })
 
 test_that("wide Excel prices are reshaped and converted to simple returns", {

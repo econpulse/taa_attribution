@@ -12,8 +12,10 @@ Depends:
     R (>= 4.6.0)
 Imports:
     bslib (>= 0.12.0),
+    DBI,
     DT (>= 0.32.1),
     readxl,
+    RSQLite,
     shiny
 Suggests:
     testthat (>= 3.0.0)
