@@ -24,11 +24,14 @@ mod_attribution_server <- function(id, database_path = getOption(
       update_choices()
     }
     update_choices <- function() {
-      meta <- metadata()
+      # This helper also runs during module initialization, before Shiny has
+      # entered a reactive consumer.  Reading reactive values in isolate()
+      # keeps UI updates usable both at startup and from observers.
+      meta <- shiny::isolate(metadata())
       shiny::updateSelectInput(session, "meta_ticker", choices = meta$ticker)
       assets <- meta$ticker[meta$instrument_type == "asset" & meta$enabled]
       shiny::updateSelectInput(session, "weight_ticker", choices = assets)
-      names <- unique(portfolios()$portfolio)
+      names <- unique(shiny::isolate(portfolios())$portfolio)
       shiny::updateSelectInput(session, "portfolio_a", choices = names)
       shiny::updateSelectInput(session, "portfolio_b", choices = names,
         selected = if (length(names) > 1L) names[2L] else names)
