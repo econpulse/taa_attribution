@@ -97,10 +97,10 @@ mod_attribution_server <- function(id) {
     })
 
     output$upload_status <- shiny::renderUI(shiny::div(class = "text-muted", upload_message()))
-    output$returns_table <- shiny::renderDataTable(returns(), options = list(pageLength = 10))
-    output$metadata_table <- shiny::renderDataTable(metadata(), options = list(pageLength = 10))
-    output$weights_table <- shiny::renderDataTable(weights(), options = list(pageLength = 10))
-    output$attribution_table <- shiny::renderDataTable({
+    output$returns_table <- DT::renderDT(returns(), options = list(pageLength = 10))
+    output$metadata_table <- DT::renderDT(metadata(), options = list(pageLength = 10))
+    output$weights_table <- DT::renderDT(weights(), options = list(pageLength = 10))
+    output$attribution_table <- DT::renderDT({
       shiny::req(results())
       data <- results()
       numeric <- vapply(data, is.numeric, logical(1))

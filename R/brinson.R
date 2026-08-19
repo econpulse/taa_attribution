@@ -51,14 +51,15 @@ read_return_file <- function(path, filename) {
 metadata_from_returns <- function(data) {
   tickers <- unique(data[c("ticker", "name")])
   tickers <- tickers[!duplicated(tickers$ticker), , drop = FALSE]
+  row_count <- nrow(tickers)
   data.frame(
     ticker = tickers$ticker,
     name = tickers$name,
-    instrument_type = "asset",
-    asset_class = "Unclassified",
-    currency = "BASE",
-    return_type = "simple",
-    enabled = TRUE,
+    instrument_type = rep("asset", row_count),
+    asset_class = rep("Unclassified", row_count),
+    currency = rep("BASE", row_count),
+    return_type = rep("simple", row_count),
+    enabled = rep(TRUE, row_count),
     stringsAsFactors = FALSE
   )
 }

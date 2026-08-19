@@ -16,7 +16,7 @@ mod_attribution_ui <- function(id) {
         ),
         bslib::card(
           bslib::card_header("Imported observations"),
-          shiny::dataTableOutput(ns("returns_table"))
+          DT::DTOutput(ns("returns_table"))
         )
       )
     ),
@@ -39,7 +39,7 @@ mod_attribution_ui <- function(id) {
         ),
         bslib::card(
           bslib::card_header("Metadata catalogue"),
-          shiny::dataTableOutput(ns("metadata_table"))
+          DT::DTOutput(ns("metadata_table"))
         )
       )
     ),
@@ -59,7 +59,7 @@ mod_attribution_ui <- function(id) {
         ),
         bslib::card(
           bslib::card_header("Definition (normalized when calculated)"),
-          shiny::dataTableOutput(ns("weights_table"))
+          DT::DTOutput(ns("weights_table"))
         )
       )
     ),
@@ -78,7 +78,7 @@ mod_attribution_ui <- function(id) {
         ),
         bslib::card(
           bslib::card_header(shiny::textOutput(ns("result_title"), inline = TRUE)),
-          shiny::dataTableOutput(ns("attribution_table")),
+          DT::DTOutput(ns("attribution_table")),
           shiny::downloadButton(ns("download_results"), "Download results")
         )
       )
