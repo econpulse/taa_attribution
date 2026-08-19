@@ -29,3 +29,31 @@ test_that("metadata defaults are repeated for every ticker", {
   expect_equal(metadata$currency, c("BASE", "BASE"))
   expect_true(all(metadata$enabled))
 })
+
+test_that("wide Excel prices are reshaped and converted to simple returns", {
+  prices <- data.frame(
+    Code = c("EQUITY", "BOND"),
+    Description = c("Equity", "Bond"),
+    `46024` = c(110, 99),
+    `46023` = c(100, 100),
+    check.names = FALSE
+  )
+
+  returns <- wide_prices_to_returns(prices)
+
+  expect_named(returns, c("ticker", "date", "name", "value"))
+  expect_equal(returns$date, as.Date(rep("2026-01-02", 2)))
+  expect_equal(returns$value, c(-0.01, 0.1))
+  expect_equal(returns$ticker, c("BOND", "EQUITY"))
+})
+
+test_that("wide prices skip blanks and reject non-date headings", {
+  prices <- data.frame(
+    id = "EQUITY", label = "Equity", `46023` = 100,
+    `46024` = NA_real_, `46025` = 121, check.names = FALSE
+  )
+  expect_equal(wide_prices_to_returns(prices)$value, 0.21)
+
+  names(prices)[3] <- "2025-12-02"
+  expect_error(wide_prices_to_returns(prices), "Excel serial date")
+})

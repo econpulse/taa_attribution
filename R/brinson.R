@@ -36,16 +36,66 @@ validate_returns <- function(data) {
 
 read_return_file <- function(path, filename) {
   extension <- tolower(tools::file_ext(filename))
-  if (extension == "csv") {
-    return(validate_returns(utils::read.csv(path, check.names = FALSE)))
-  }
-  if (!extension %in% c("xls", "xlsx")) {
-    stop("Upload a .xlsx, .xls, or .csv file.", call. = FALSE)
+  if (extension != "xlsx") {
+    stop("Upload a .xlsx file.", call. = FALSE)
   }
   if (!requireNamespace("readxl", quietly = TRUE)) {
     stop("Package 'readxl' is required for Excel uploads.", call. = FALSE)
   }
-  validate_returns(as.data.frame(readxl::read_excel(path)))
+  prices <- as.data.frame(readxl::read_excel(path, .name_repair = "minimal"),
+    check.names = FALSE)
+  wide_prices_to_returns(prices)
+}
+
+wide_prices_to_returns <- function(data) {
+  if (ncol(data) < 3L) {
+    stop("The workbook must contain ticker, name, and at least one date column.",
+      call. = FALSE)
+  }
+
+  names(data)[1:2] <- c("ticker", "name")
+  date_labels <- trimws(names(data)[-(1:2)])
+  excel_dates <- suppressWarnings(as.numeric(date_labels))
+  if (anyNA(excel_dates)) {
+    stop("Every column after ticker and name must be an Excel serial date.",
+      call. = FALSE)
+  }
+  dates <- as.Date(excel_dates, origin = "1899-12-30")
+  if (anyNA(dates) || anyDuplicated(dates)) {
+    stop("Price date columns must contain unique, valid Excel serial dates.",
+      call. = FALSE)
+  }
+
+  rows <- lapply(seq_len(nrow(data)), function(i) {
+    ticker <- trimws(as.character(data$ticker[i]))
+    name <- as.character(data$name[i])
+    raw_prices <- unlist(data[i, -(1:2), drop = FALSE], use.names = FALSE)
+    prices <- suppressWarnings(as.numeric(raw_prices))
+    invalid_number <- !is.na(raw_prices) & nzchar(trimws(as.character(raw_prices))) &
+      is.na(prices)
+    if (any(invalid_number)) {
+      stop("Prices must be numeric (ticker: ", ticker, ").", call. = FALSE)
+    }
+    observed <- !is.na(prices)
+    prices <- prices[observed]
+    observed_dates <- dates[observed]
+    if (any(!is.finite(prices) | prices <= 0)) {
+      stop("Prices must be finite and greater than zero (ticker: ", ticker, ").",
+        call. = FALSE)
+    }
+    order_index <- order(observed_dates)
+    prices <- prices[order_index]
+    observed_dates <- observed_dates[order_index]
+    if (length(prices) < 2L) return(empty_returns())
+    data.frame(
+      ticker = rep(ticker, length(prices) - 1L),
+      date = observed_dates[-1L],
+      name = rep(name, length(prices) - 1L),
+      value = prices[-1L] / prices[-length(prices)] - 1,
+      stringsAsFactors = FALSE
+    )
+  })
+  validate_returns(do.call(rbind, rows))
 }
 
 metadata_from_returns <- function(data) {

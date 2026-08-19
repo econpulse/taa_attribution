@@ -1,19 +1,22 @@
 # TAA Attribution
 
 Shiny dashboard for flexible, holdings-based Brinson attribution. Users supply only
-return observations and then enrich each ticker inside the application.
+price observations and then enrich each ticker inside the application.
 
-## Return workbook
+## Price workbook
 
-Upload an `.xlsx`, `.xls`, or `.csv` file containing one observation per ticker and
-date. Column names are case-insensitive and must be:
+Upload an `.xlsx` file in wide format. Each row represents one series. The first two
+columns are interpreted as ticker and display name (their original headings do not
+matter); every subsequent column heading must be a numeric Excel serial date.
 
-| Column | Meaning |
-|---|---|
-| `ticker` | Stable, unique series identifier |
-| `date` | Observation date (ISO date or an Excel date) |
-| `name` | Initial display label; it can be changed in the app |
-| `value` | Simple or logarithmic period return, expressed as a decimal |
+| First column | Second column | Following columns |
+|---|---|---|
+| Stable, unique ticker | Initial display name | Prices under Excel serial-date headings |
+
+The application sorts the dates for each ticker and calculates simple returns as
+`current price / previous price - 1`. The first price therefore establishes the
+base and does not produce a return. Blank prices are skipped; at least two observed
+prices are needed for a ticker to produce a return.
 
 The metadata step classifies each series as either an **asset** or **currency**
 series. Assets receive a freely chosen asset-class label and a currency exposure.
