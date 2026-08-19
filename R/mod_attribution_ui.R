@@ -8,10 +8,13 @@ mod_attribution_ui <- function(id) {
       bslib::layout_columns(
         col_widths = c(4, 8),
         bslib::card(
-          bslib::card_header("Upload return series"),
-          shiny::fileInput(ns("return_file"), "Excel or CSV",
-            accept = c(".xlsx", ".xls", ".csv")),
-          shiny::helpText("Required columns: ticker, date, name, value. Values are period returns, not prices."),
+          bslib::card_header("Upload price series"),
+          shiny::fileInput(ns("return_file"), "Excel workbook", accept = ".xlsx"),
+          shiny::helpText(paste(
+            "Wide format: the first two columns contain ticker and name;",
+            "all following column headers are Excel serial dates and their values are prices.",
+            "Period returns are calculated automatically."
+          )),
           shiny::uiOutput(ns("upload_status"))
         ),
         bslib::card(
